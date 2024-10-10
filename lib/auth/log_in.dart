@@ -1,8 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ecommerce_app/auth/sign_in.dart';
+import 'package:ecommerce_app/screens/home_view.dart';
 import 'package:ecommerce_app/widgets/custom_button.dart';
 import 'package:ecommerce_app/widgets/custom_textfield.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LogIn extends StatefulWidget {
   const LogIn({super.key});
@@ -12,10 +15,11 @@ class LogIn extends StatefulWidget {
 }
 
 class _LogInState extends State<LogIn> {
-
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void dispose() {
@@ -24,11 +28,62 @@ class _LogInState extends State<LogIn> {
     super.dispose();
   }
 
+  Future<void> _loginUser() async {
+    try {
+      QuerySnapshot userSnapshot = await _firestore
+          .collection('users') 
+          .where('email', isEqualTo: emailController.text)
+          .get();
+
+      if (userSnapshot.docs.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User does not exist.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      await _auth.signInWithEmailAndPassword(
+        email: emailController.text,
+        password: passwordController.text,
+      );
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const HomeView(),
+        ),
+      );
+
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = 'An error occurred';
+      if (e.code == 'user-not-found') {
+        errorMessage = 'No user found for that email.';
+      } else if (e.code == 'wrong-password') {
+        errorMessage = 'Wrong password provided.';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Something went wrong. Please try again later.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFF5F9FD),
+      backgroundColor: const Color(0xFFF5F9FD),
       appBar: AppBar(
         title: const Text(
           'e-Shop',
@@ -53,89 +108,80 @@ class _LogInState extends State<LogIn> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-
                       CustomTextField(
-                        controller: emailController, 
-                        hintText: 'Email', 
+                        controller: emailController,
+                        hintText: 'Email',
                         keyboardType: TextInputType.emailAddress,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your email'; 
+                            return 'Please enter your email';
                           }
-                          const pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'; // Regular expression for validating email format
+                          const pattern =
+                              r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$';
                           final regExp = RegExp(pattern);
                           if (!regExp.hasMatch(value)) {
-                            return 'Please enter a valid email'; 
+                            return 'Please enter a valid email';
                           }
-                          return null; 
+                          return null;
                         },
                       ),
-                      SizedBox(height: 10.0),
-
-
+                      const SizedBox(height: 10.0),
                       CustomTextField(
-                        controller: passwordController, 
-                        hintText: 'Password', 
+                        controller: passwordController,
+                        hintText: 'Password',
                         keyboardType: TextInputType.text,
                         isPassword: true,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your password'; 
+                            return 'Please enter your password';
                           }
-                          return null; 
+                          return null;
                         },
                       ),
                     ],
                   ),
                 ),
               ),
-
-              // Submit Button
               CustomButton(
-                buttonText: 'Login', 
+                buttonText: 'Login',
                 onPressed: () {
                   if (_formKey.currentState!.validate()) {
-                    // If the form is valid, process the data.
-                    print('Email: ${emailController.text}');
-                    print('Password: ${passwordController.text}');
+                    _loginUser();
                   }
                 },
               ),
-              SizedBox(height: 8.0),
-
-              // Sign In Button
+              const SizedBox(height: 8.0),
               RichText(
                 text: TextSpan(
                   children: [
-                    TextSpan(
+                    const TextSpan(
                       text: 'New here? ',
                       style: TextStyle(
-                        color: Colors.black, // Change this to your preferred color
+                        color: Colors.black,
                         fontSize: 16.0,
                         fontWeight: FontWeight.normal,
                       ),
                     ),
                     TextSpan(
                       text: 'Signup',
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Color(0xFF0C54BE),
                         fontSize: 16.0,
                         fontWeight: FontWeight.bold,
                       ),
-                      recognizer: TapGestureRecognizer()..onTap = () {
-                        // Navigate to the sign in screen
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => SignIn(),
-                          ),
-                        );
-                      },
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const SignIn(),
+                            ),
+                          );
+                        },
                     ),
                   ],
                 ),
               ),
-
-              SizedBox(height: 15.0),
+              const SizedBox(height: 15.0),
             ],
           ),
         ),
