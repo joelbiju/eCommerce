@@ -1,6 +1,8 @@
-import 'dart:convert';
+// ignore: library_private_types_in_public_api
+import 'package:ecommerce_app/model/product_model.dart';
+import 'package:ecommerce_app/screens/product_details.dart';
+import 'package:ecommerce_app/view_model/product_view_model.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:ecommerce_app/widgets/product_card.dart';
 
 class HomeView extends StatefulWidget {
@@ -11,7 +13,8 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> {
-  List<dynamic> products = [];
+  List<Product> products = [];
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -20,26 +23,25 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Future<void> fetchProducts() async {
+    final productViewModel = ProductViewModel();
     try {
-      final response = await http.get(Uri.parse('https://dummyjson.com/products'));
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonData = json.decode(response.body);
-        setState(() {
-          products = jsonData['products'];
-        });
-      } else {
-        throw Exception('Failed to load products: ${response.reasonPhrase}');
-      }
+      final productData = await productViewModel.fetchProducts();
+      setState(() {
+        products = productData;
+        isLoading = false;
+      });
     } catch (e) {
       print('Error fetching products: $e');
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFF5F9FD),
+      backgroundColor: const Color(0xFFF5F9FD),
       appBar: AppBar(
         title: const Text(
           'e-Shop',
@@ -53,30 +55,32 @@ class _HomeViewState extends State<HomeView> {
         backgroundColor: const Color(0xFF0C54BE),
       ),
       body: SafeArea(
-        child: products.isEmpty 
-            ? Center(child: CircularProgressIndicator())
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
             : GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   mainAxisSpacing: 10.0,
-                  childAspectRatio: 0.65, 
+                  childAspectRatio: 0.65,
                 ),
-                itemCount: products.length, 
+                itemCount: products.length,
                 itemBuilder: (context, index) {
                   final product = products[index];
-                  final originalPrice = product['price'].toDouble();
-                  final discountPercentage = product['discountPercentage'];
-                  final discountPrice = discountPercentage != null
-                      ? originalPrice - (originalPrice * discountPercentage / 100)
-                      : originalPrice; 
+                  final discountPrice = product.price -
+                      (product.price * product.discountPercentage / 100);
 
-                  return ProductCard(
-                    imageUrl: product['images'][0], 
-                    title: product['title'],
-                    description: product['description'],
-                    rating: product['rating'].toDouble(), 
-                    originalPrice: originalPrice, 
-                    discountPrice: discountPrice, 
+                  return GestureDetector(
+                    child: ProductCard(
+                      imageUrl: product.images[0],
+                      title: product.title,
+                      description: product.description,
+                      rating: product.rating,
+                      originalPrice: product.price,
+                      discountPrice: discountPrice,
+                    ),
+                    onTap: () {
+                      showProductDetails(context, product);
+                    },
                   );
                 },
               ),
